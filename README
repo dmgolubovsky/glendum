@@ -1,0 +1,3 @@
+Glendum is an experimental port of the Plan9 kernel to SKAS mode 
+(same as used in User Mode Linux).
+
