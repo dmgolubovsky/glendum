@@ -1,3 +1,5 @@
 Glendum is an experimental port of the Plan9 kernel to SKAS mode 
 (same as used in User Mode Linux).
 
+SKAS mode is based on mmap-ing of process thread address space onto a large file 
+(in some cases on tmpfs which makes it hold completely in memory).
