@@ -1,0 +1,7 @@
+#! /bin/rc
+
+bp=`{basename -d $0}
+
+# Alter the current namespace to make the user-mode 386 (um) arch visible.
+
+bind -b -c $bp/sys-src-9 /sys/src/9

@@ -1,0 +1,7 @@
+#! /bin/rc
+
+# Remove the directories related to the um arch
+
+bp=`{basename -d $0}
+
+unmount $bp/sys-src-9 /sys/src/9

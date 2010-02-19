@@ -1,0 +1,235 @@
+/*
+ * The UM-kernel has completely different method of memory management,
+ * hence this module is to accomodate the need for that.
+ */
+
+#include	"u.h"
+#include	"../port/lib.h"
+#include	"mem.h"
+#include	"dat.h"
+#include	"fns.h"
+#include	"io.h"
+
+#include	"umhost.h"
+
+/*
+ * Some stuff comes from the original mmu.c
+ */
+
+/*
+ * These could go back to being macros once the kernel is debugged,
+ * but the extra checking is nice to have.
+ */
+void*
+kaddr(ulong pa)
+{
+kprintf("kaddr %08lx\n", pa);
+	if(pa > (ulong)-KZERO)
+		panic("kaddr: pa=%#.8lux", pa);
+	return (void*)pa;
+//	return (void*)(pa+KZERO);
+}
+
+ulong
+paddr(void *v)
+{
+	ulong va;
+	
+	va = (ulong)v;
+//	if(va < KZERO)
+//		panic("paddr: va=%#.8lux pc=%#p", va, getcallerpc(&v));
+	return va;
+//	return va-KZERO;
+}
+/*
+ulong
+cankaddr(ulong pa)
+{
+	if(pa >= -KZERO)
+		return 0;
+	return -KZERO - pa;
+}
+*/
+void
+mmuinit(void)
+{
+
+}
+
+/*
+ * Initialize memory control structures.
+ * Fill in the conf.mem elements (first two). The first describes
+ * the chunk of memory mapped at zero till the physical memory limit
+ * for processes. The second describes the kernel pool.
+ */
+
+void
+meminit(void)
+{
+	confmemAA(&conf.npage, &conf.upages);
+	ustktopA(&conf.ustktop);
+	hostmemAA(&palloc.mem[0].base, &palloc.mem[0].npage);
+}
+
+/*
+ * Formerly in xalloc.c
+ */
+
+void
+xsummary(void)
+{
+	print("xsummary cannot be provided in UM\n");
+}
+
+void*
+xalloc(ulong size)
+{
+	return xallocz(size, 1);
+}
+
+void*
+xallocz(ulong size, int zero)
+{
+	void *ret;
+	print("xallocz size %lud\n", size);
+	mallocVA(size, &ret);
+print("xallocz alloc at %08lux\n", ret);
+	if(zero)
+		memset(ret, 0, size);
+	return ret;
+}
+
+void
+xfree(void *p)
+{
+	freeA(p);
+}
+
+int
+xmerge(void *, void *)
+{
+	return 0;
+}
+
+KMap*
+kmap(Page *page)
+{
+kprintf("kmap pa: %08ux va: %08ux\n", page->pa, page->va);
+	return nil;
+}
+
+void
+mmurelease(Proc* proc)
+{
+kprintf("mmurelease pid:%d\n", proc->pid);
+	return;
+}
+
+void
+mmuswitch(Proc* proc)
+{
+kprintf("mmuswitch pid:%d\n", proc->pid);
+	return;
+}
+
+ulong*
+mmuwalk(ulong* pdb, ulong va, int level, int create)
+{
+print("mmuwalk pdb=%08lux, va=%08lux, level=%d, create=%d\n", 
+(ulong)pdb, va, level, create);
+	return 0;
+}
+
+void
+putmmu(ulong va, ulong pa, Page*)
+{
+kprintf("putmmu pa: %08ux va: %08ux\n", pa, va);
+	return;
+}
+
+void
+kunmap(KMap *k)
+{
+kprintf("kunmap: %08ux\n", k);
+	return;
+}
+
+/*
+ * In UM kernel, if a page is created, it is already mapped within the
+ * "physical" memory at its "physical" address. Just return that address.
+ */
+
+void*
+tmpmap(Page *p)
+{
+print("tmpmap pa: %08lux va: %08lux\n", p->pa, p->va);
+	return (void *)p->pa;
+}
+
+/*
+ * Nothing to do here: the page does not go away.
+ */
+
+void
+tmpunmap(void *v)
+{
+print("tmpunmap: %08lux\n", v);
+	return;
+}
+
+void*
+vmap(ulong pa, int size)
+{
+kprintf("vmap: pa:%08ux, size:%d\n", pa, size);
+	return nil;
+}
+
+void
+vunmap(void *v, int size)
+{
+kprintf("vmap: v:%08ux, size:%d\n", v, size);
+	return;
+}
+
+void
+checkfault(ulong, ulong)
+{
+}
+
+void
+checkmmu(ulong, ulong)
+{
+}
+
+void
+countpagerefs(ulong *ref, int print)
+{
+kprintf("countpagerefs: ref:%08ux, print:%d\n", ref, print);
+}
+
+int
+vmapsync(ulong va)
+{
+kprintf("vmapsync: %08ux\n", va);
+	return 1;
+}
+
+void
+flushmmu(void)
+{
+}
+
+
+ulong
+upaalloc(int size, int align)
+{
+kprintf("upaalloc size:%d, align:%d\n", size, align);
+	return 0;
+}
+
+void
+upareserve(ulong pa, int size)
+{
+kprintf("upareserve pa:%08ux, size:%d\n", pa, size);
+	return;
+}
