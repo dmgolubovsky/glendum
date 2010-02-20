@@ -149,6 +149,17 @@ uartgetc(void)
  * Host functions.
  */
 
+/*
+ * Jump here for non-patched host call. Not much can be done,
+ * just segv.
+ */
+
+void 
+_failcall(void)
+{
+	*((int *)nil) = 1;
+}
+
 /* kprintA #1 */
 
 void 

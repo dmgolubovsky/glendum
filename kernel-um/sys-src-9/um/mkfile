@@ -59,6 +59,7 @@ OBJ=\
 	umpage.$O\
 	random.$O\
 	trap.$O\
+	hostfns.$O\
 	$CONF.root.$O\
 	$CONF.rootc.$O\
 	$DEVS\
@@ -195,4 +196,8 @@ checkdist:VQ:
 $p$CONF.flp: /386/9load plan9.ini $p$CONF.gz
 	disk/format -b /386/pbs -df $target $prereq
 
+#	Autogenerate host function calls for patching by the loader.
 
+hostfns.s:	hostfns.h
+	mkhostfns <hostfns.h >hostfns.s
+	

@@ -1,0 +1,22 @@
+#! /bin/rc
+
+grep HOSTLINK | awk '
+	BEGIN {
+		print "/*"
+		print " *\t File generated automatically, do not edit."
+		print " */\n\n\n"
+	}
+	{
+		for (i = 1; i < NF ; i++) {
+			if ($i == "HOSTLINK" && $(i + 2) == "HOSTARGS") break;
+		}
+		if (i < NF) {
+			print "/*"
+			print " *\t" $i " " $(i + 1)
+			print " */"
+			print "TEXT " $(i + 1) "(SB), $0"
+			print "\tJMP\t_failcall(SB)"
+			print ""
+		}
+	}
+'

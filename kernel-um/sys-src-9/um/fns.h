@@ -180,3 +180,12 @@ int	xchgw(ushort*, int);
 #define PADDR(a)	paddr((void*)(a))
 
 #define	dcflush(a, b)
+
+/*
+ * Define tokens necessary for hostfns auto processing
+ */
+
+#define HOSTLINK
+#define HOSTARGS
+
+#include "hostfns.h"

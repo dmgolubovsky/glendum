@@ -1,4 +1,4 @@
-/* Print Plan9 kernel image a.out header */
+/* Plan9 a.out kernel image loader */
 
 #include <sys/types.h>
 #include <asm/byteorder.h>
@@ -174,7 +174,8 @@ int main(int argc, char **argv) {
        	void *ptext, *pdata, *pload;
 	long mbpos;
 	multiboot_header_t mbhdr;
-	unsigned long magic, entry, stext, stextp, sdata, sdatap;
+	unsigned long magic, entry, stext, ssyms,
+		      offsyms, stextp, sidata, sdata, sdatap;
 	struct Exec hdr;
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s filename\n", argv[0]);
@@ -197,6 +198,8 @@ int main(int argc, char **argv) {
 	}
 	entry = __be32_to_cpu(hdr.entry);
 	stext = __be32_to_cpu(hdr.text);
+	sidata = __be32_to_cpu(hdr.data);
+	ssyms = __be32_to_cpu(hdr.syms);
 	sdata = __be32_to_cpu(hdr.data) + __be32_to_cpu(hdr.bss);
 	printf("entry point at %08lx\n", entry);
 	stextp = stext + (4096 - stext) % 4096;
@@ -283,6 +286,7 @@ int main(int argc, char **argv) {
 	}
 	printf("text size %08lx, adjusted to page %08lx\n", stext, stextp);
 	printf("data size %08lx, adjusted to page %08lx\n", sdata, sdatap);
+	printf("symbol table at %08lx, size %d\n", stext + sidata + sizeof(hdr));
 	if(read(fd, (char *)ptext, stext) == -1) {
 		perror("read text segment");
 		close(fd);
@@ -293,7 +297,7 @@ int main(int argc, char **argv) {
 		close(fd);
 		exit(-15);
 	}
-	if(read(fd, (char *)pdata, sdata) == -1) {
+	if(read(fd, (char *)pdata, sidata) == -1) {
 		perror("read data segment");
 		close(fd);
 		exit(-8);
