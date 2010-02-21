@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <alloca.h>
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/time.h>
@@ -38,6 +39,15 @@ char *plan9ini=
 #define PHYSMEM 64*1024*1024
 
 #define NPAGE (PHYSMEM / 4096)
+
+typedef struct {
+	char *symname;
+	void *funaddr;
+} Patch;
+
+int hwrite(char *buf, size_t size) {
+	return write(1, buf, size);
+}
 
 
 void *physmem(ulong size) {
@@ -168,6 +178,102 @@ long hostsvc(int svcn, void * parms[]) {
 	return 0;
 }
 
+int dblen(char *s) {
+	int i;
+	for(i = 0; ;i++) {
+		if(s[i] == 0 && s [i + 1] == 0)
+			return i;
+	}
+}
+
+/*
+ * Table of patches. If a symbol is found with given name (.symname),
+ * proper function address will be written at offset 2 from the symbol
+ * to patch the code segment.
+ */
+
+Patch ptt[] = {
+	(Patch){.symname = "host_alloc", .funaddr = malloc},
+	(Patch){.symname = "host_free", .funaddr = free},
+	(Patch){.symname = "host_write", .funaddr = hwrite},
+	(Patch){.symname = "host_cpufreq", .funaddr = getmhz},
+	(Patch){NULL}
+};
+
+/*
+ * Check if the memory at the given address contains 0xFF, 0x25 in its first
+ * two bytes. If yes, copy the function address at the offset 6.
+ */
+
+void patchcode(void *addr, void *funaddr) {
+	unsigned char *caddr = addr;
+	if((caddr[0] == 0xFF) && (caddr[1] == 0x25)) {
+		printf("patching %08x\n", addr);
+		memcpy(caddr + 6, &funaddr, sizeof(funaddr));
+	}
+}
+
+/*
+ * Read the symbol table from the file, patch the code segment.
+ * To speed up patching, host link symbols are between __hostlink_begin and
+ * __hostlink_end.
+ */
+
+void hostlink(int fd, unsigned long offsyms, unsigned long ssyms) {
+	off_t savepos = lseek(fd, 0, SEEK_CUR);
+	int rc, symsize, active;
+	char *symname;
+	char stype;
+	unsigned char *symp, *symt = alloca(ssyms);
+	unsigned long *addrp, addr;
+	rc = lseek(fd, offsyms, SEEK_SET);
+	if(rc == -1) {
+		perror("seek to the symbol table");
+		exit(-40);
+	}
+	rc = read(fd, symt, ssyms);
+	if(rc != ssyms) {
+		fprintf(stderr, "incomplete read of symbol table, %ld vs. %ld\n", 
+				(unsigned long)rc, ssyms);
+	}
+	symp = symt;
+	active = 0;
+	while(1) {
+		addrp = (unsigned long *)symp;
+		addr = __be32_to_cpu(*addrp);
+		stype = (char *)symp[4] - 0x80;
+		symname = (char *)symp + 5;
+		switch(stype) {
+			case 'Z':
+			case 'z':
+				symsize = 5 + dblen(symname + 1) + 3;
+				break;
+			default:
+				symsize = 5 + strlen(symname) + 1;
+
+		}
+		if((stype == 'T') && (!strcmp(symname, "__hostlink_begin")))
+			active = 1;
+		if(active) {
+			printf("%s[%d] / %c: %08lx\n", symname, symsize, stype, addr);
+			if((stype == 'T') && (!strcmp(symname, "__hostlink_end")))
+				break;
+			if(stype == 'T') {
+				Patch *p;
+				for(p = ptt; p->funaddr != NULL; p++) {
+					if(!strcmp(p->symname, symname)) {
+						printf("found %s to patch\n", symname);
+						patchcode(addr, p->funaddr);
+					}
+				}
+			}
+		}
+		symp += symsize;
+		if(symp - symt >= ssyms) break;
+	}
+	lseek(fd, savepos, SEEK_SET);
+}
+
 int main(int argc, char **argv) {
 	int i, fd, rc;
 	unsigned long magbuf;
@@ -284,14 +390,16 @@ int main(int argc, char **argv) {
 		close(fd);
 		exit(-6);
 	}
+	offsyms = stext + sidata + sizeof(hdr);
 	printf("text size %08lx, adjusted to page %08lx\n", stext, stextp);
 	printf("data size %08lx, adjusted to page %08lx\n", sdata, sdatap);
-	printf("symbol table at %08lx, size %d\n", stext + sidata + sizeof(hdr));
+	printf("symbol table at %08lx, size %ld\n", offsyms, ssyms);
 	if(read(fd, (char *)ptext, stext) == -1) {
 		perror("read text segment");
 		close(fd);
 		exit(-7);
 	}
+	hostlink(fd, offsyms, ssyms);
 	if(mprotect((void *)mbhdr.load_addr, stextp, PROT_READ|PROT_EXEC) == -1) {
 		perror("mprotect text segment");
 		close(fd);

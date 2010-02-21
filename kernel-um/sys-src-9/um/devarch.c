@@ -709,7 +709,8 @@ cpuidentify(void)
 			break;
 
 	m->cpuidtype = t->name;
-	cpufreqA(&m->cpumhz);
+	m->cpumhz = host_cpufreq();
+//	cpufreqA(&m->cpumhz);
 
 	cputype = t;
 	return t->family;

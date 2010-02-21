@@ -92,7 +92,8 @@ xallocz(ulong size, int zero)
 {
 	void *ret;
 	print("xallocz size %lud\n", size);
-	mallocVA(size, &ret);
+//	mallocVA(size, &ret);
+	ret = host_alloc(size);
 print("xallocz alloc at %08lux\n", ret);
 	if(zero)
 		memset(ret, 0, size);
@@ -102,7 +103,7 @@ print("xallocz alloc at %08lux\n", ret);
 void
 xfree(void *p)
 {
-	freeA(p);
+	host_free(p);
 }
 
 int

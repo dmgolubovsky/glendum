@@ -13,3 +13,8 @@
 void * HOSTLINK host_alloc HOSTARGS (ulong size);
 
 int HOSTLINK host_write HOSTARGS (char *buf, int length);
+
+void HOSTLINK host_free HOSTARGS (void *p);
+
+int HOSTLINK host_cpufreq HOSTARGS (void);
+

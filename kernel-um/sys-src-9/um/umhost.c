@@ -198,11 +198,7 @@ kprintf(char *fmt, ...)
 void
 kwriteAU(char *buf, int length)
 {
-	Hostparm b = {.addr = buf},
-			 c = {.uval = length},
-			ps[2] = {b, c};
-	(*_hcall)(4, ps);
-	return;
+	host_write(buf, length);
 }
 
 /* confmemAA #5 */
