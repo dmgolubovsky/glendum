@@ -41,19 +41,24 @@ paddr(void *v)
 	return va;
 //	return va-KZERO;
 }
-/*
-ulong
-cankaddr(ulong pa)
-{
-	if(pa >= -KZERO)
-		return 0;
-	return -KZERO - pa;
-}
-*/
+
+static uvlong globmmid;
+
 void
 mmuinit(void)
 {
+	globmmid = 0ll;
+}
 
+/*
+ * Unique mmid generator.
+ */
+
+uvlong
+newmmid(void)
+{
+	globmmid++;
+	return globmmid;
 }
 
 /*

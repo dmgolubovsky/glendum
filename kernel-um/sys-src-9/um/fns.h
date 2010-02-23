@@ -175,6 +175,8 @@ void	wbinvd(void);
 void	wrmsr(int, vlong);
 int	xchgw(ushort*, int);
 
+uvlong newmmid(void);
+
 #define	waserror()	(up->nerrlab++, setlabel(&up->errlab[up->nerrlab-1]))
 #define	KADDR(a)	kaddr(a)
 #define PADDR(a)	paddr((void*)(a))

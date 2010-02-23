@@ -32,6 +32,10 @@ void
 um_main(void) 
 {
 	print("glendum...\n");
+	if(NSEGx < NSEG) {
+		print("NSEGx has to be at least %d, but is %d. Adjust in dat.h and rebuild the kernel\n", NSEG, NSEGx);
+		return;
+	}
 	m = &bootmach;
 	m->machno = 1;
 	memset(edata, 0, end - edata); /* clear BSS like l.s does */

@@ -15,6 +15,7 @@ typedef struct PCMmap	PCMmap;
 typedef struct PCMslot	PCMslot;
 typedef struct Page	Page;
 typedef struct PMMU	PMMU;
+typedef struct Uthread Uthread;
 typedef struct Proc	Proc;
 typedef struct Segdesc	Segdesc;
 typedef vlong		Tval;
@@ -110,18 +111,34 @@ struct Conf
 };
 
 /*
- *  MMU stuff in proc
+ *  MMU stuff in proc. In the UM kernel it contains information
+ *	about the user thread to which the process is bound, and
+ *	about the memory mappings.
  */
+
 #define NCOLOR 1
+
+/* 
+ * Dirty hack: NSEG is defined in portdat.h, but
+ * the latter has to be included after PMMU is defined.
+ * So define NSEGx here manually, and when starting up
+ * check if NSEGx ge NSEG, and if not, bail out. 
+ */
+
+#define NSEGx 12	
 struct PMMU
 {
-	Page*	mmupdb;			/* page directory base */
-	Page*	mmufree;		/* unused page table pages */
-	Page*	mmuused;		/* used page table pages */
-	Page*	kmaptable;		/* page table used by kmap */
-	uint	lastkmap;		/* last entry used by kmap */
-	int	nkmap;			/* number of current kmaps */
+	Uthread *uthr;			/* user thread this process is bound to, 
+							   may be nil if a process is waiting, and
+							   its thread was taken over */
+	uvlong mmids[NSEGx];	/* memory map ids for each segment. 
+							   All mmids are unique (hence uvlong).
+							   Increment of an ID in PMMU causes remapping 
+							   of the segment once process goes back to
+							   user space. mmid = 0 means segment does not
+							   exist for given index. */
 };
+
 
 /*
  *  things saved in the Proc structure during a notify
@@ -134,6 +151,25 @@ struct Notsave
 };
 
 #include "../port/portdat.h"
+
+/*
+ *	User thread information structure. User threads execute the code
+ *	of Plan 9 processes in the address space separate from kernel.
+ *	MAXUTHREAD specifies maximum number of user threads to start;
+ *	MINUTHREAD is default number of threads unless otherwise specified
+ *	in the configuration.
+ */
+
+#define MAXUTHREAD 8
+
+#define MINUTHREAD 2
+
+struct Uthread
+{
+	int upid;			/* Host process ID */
+	Proc *proc;			/* Plan 9 process descriptor, or nil if not bound */
+	uvlong cmmids[NSEG];/* current memory mappings */
+};
 
 typedef struct {
 	ulong	link;			/* link (old TSS selector) */
@@ -172,16 +208,11 @@ struct Segdesc
 
 struct Mach
 {
-	int	machno;			/* physical id of processor (KNOWN TO ASSEMBLY) */
+	int	machno;				/* physical id of processor (KNOWN TO ASSEMBLY) */
 	ulong	splpc;			/* pc of last caller to splhi */
-
-	//ulong*	pdb;			/* page directory base for this processor (va) */
 
 	Proc*	proc;			/* current process on this processor */
 	Proc*	externup;		/* extern register Proc *up */
-
-//	Page*	pdbpool;
-//	int	pdbcnt;
 
 	ulong	ticks;			/* of the clock since boot time */
 	Label	sched;			/* scheduler wakeup */
@@ -220,8 +251,6 @@ struct Mach
 	int	havetsc;
 	int	havepge;
 	uvlong	tscticks;
-//	int	pdballoc;
-//	int	pdbfree;
 
 	vlong	mtrrcap;
 	vlong	mtrrdef;

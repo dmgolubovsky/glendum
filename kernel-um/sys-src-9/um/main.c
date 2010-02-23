@@ -90,12 +90,14 @@ options(void)
 
 
 extern void (*i8237alloc)(void);
+void uthreadinit(void);
 
 void
 main(void)
 {
 	mach0init();
 	options();
+	uthreadinit();
 	ioinit();
 	quotefmtinstall();
 	umscreeninit();
