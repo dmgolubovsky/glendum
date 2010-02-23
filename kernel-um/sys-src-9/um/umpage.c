@@ -15,7 +15,7 @@ void
 pageinit(void)
 {
 	int color, i, j;
-	uvlong kpl;
+	ulong kpl;
 	Page *p;
 	Pallocmem *pm;
 	ulong m, np, pkb;
@@ -59,8 +59,8 @@ pageinit(void)
 	for(i=0; i<nelem(conf.mem); i++)
 		if(conf.mem[i].npage)
 			m += conf.mem[i].npage*BY2PG;
-	maxpoolA(&kpl);
-	print("%lldM kernel data, ", kpl/(1024*1024));
+	host_kpool(&kpl, end);
+	print("%ldM kernel data, ", kpl/(1024*1024));
 	print("%ldM user\n ", pkb/1024);
 }
 

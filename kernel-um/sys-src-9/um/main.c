@@ -53,7 +53,7 @@ options(void)
 	 *  fetch configuration from the host
 	 */
 
-	getconfAU(confbuf, 4096);
+	host_getconf(confbuf, 4096);
 
 	/*
 	 *  parse configuration args from dos file plan9.ini
@@ -135,7 +135,7 @@ main(void)
 //	i8253link();
 //	swapinit();
 	userinit();
-kprintA("***\n");
+print("***\n");
 	active.thunderbirdsarego = 1;
 	schedinit();
 }
@@ -703,7 +703,7 @@ reboot(void *entry, void *code, ulong size)
 	 * should be the only processor running now
 	 */
 
-	kprintA("shutting down...\n");
+	print("shutting down...\n");
 	delay(200);
 
 	splhi();
@@ -726,7 +726,7 @@ reboot(void *entry, void *code, ulong size)
 	f = (void*)REBOOTADDR;
 	memmove(f, rebootcode, sizeof(rebootcode));
 
-	kprintA("rebooting...\n");
+	print("rebooting...\n");
 
 	/* off we go - never to return */
 	coherence();

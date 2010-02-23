@@ -23,8 +23,7 @@ typedef unsigned long long uvlong;
 
 extern char phys, end; /*top of bss, defined by linker */
 
-typedef long (*hostcall) (int, void **);
-typedef void (*kstart)(hostcall);
+typedef void (*kstart)();
 
 char *plan9ini=
 	"debug=1\r\n"
@@ -96,86 +95,43 @@ int getmhz(void) {
 	return (int)mhz;
 }
 
-uvlong botsp(char x) {
-	return (uvlong)&x;
+void getconf(char *buf, int size) {
+	strncpy(buf, plan9ini, size - 1);
 }
 
-long hostsvc(int svcn, void * parms[]) {
-	switch(svcn) {
-		case 1:	/* kprintA: 0: string to print */
-			printf("%s", (char *)parms[0]);
-			fflush(stdout);
-			break;
-		case 2:	/* getconfAU: 0: config buffer, 1: buffer size */
-			strncpy((char *)parms[0], plan9ini, (size_t)(parms[1] - 1));
-			break;
-		case 3:	/* kprintf: formatted output */
-			vprintf(parms[0], (va_list)(parms + 1));
-			fflush(stdout);
-			break;
-		case 4:	/* kwriteAU: 0: buffer address, 1: buffer size */
-			fflush(stdout);
-			write(1, (char *)parms[0], (int)parms[1]);
-			break;
-		case 5:	/* confmemAA: 0: return NPAGE to, 1: return UPAGES to */
-			*((ulong *)parms[0]) = NPAGE;
-			*((ulong *)parms[1]) = NPAGE;
-			break;
-		case 6:	/* hostmemAA: 0: return base to, 1: return number of pages to */
-			{
-				void *phmem = physmem(PHYSMEM);
-				*((void **)parms[0]) = phmem;
-				*((ulong *)parms[1]) = NPAGE;
-			}
-			break;
-		case 7:	/* mallocVA: 0: requested size, 1: return allocated address to */
-			{
-				ulong size = (ulong)parms[0];
-				void *mem = malloc(size);
-				if(mem == NULL) {
-					fprintf(stderr, "malloc(%lu) failed\n", size);
-					exit(-28);
-				}
-				*((void **)parms[1]) = mem;
-			}
-			break;
-		case 8:	/* freeA: 0: address to be freed */
-			free(parms[0]);
-			break;
-		case 9:	/* cpufreqA: 0: address where to put CPU frequency */
-			*((ulong *)parms[0]) = getmhz();
-			break;
-		case 10:/* hosttimeAA: 0: address to put timer hz, 1: address to put time in ns */
-			{
-				struct timeval ts;
-				struct timezone tz;
-				uvlong hosttm;
-				int rc = gettimeofday(&ts, &tz);
-				if(rc == -1) {
-					perror("gettimeofday");
-					exit (-32);
-				}
-				hosttm = (uvlong)ts.tv_sec * 1000000000ull + 
-					(uvlong)ts.tv_usec * 1000ull;
-				if(parms[0] != NULL)
-					*((ulong *)parms[0]) = 50;
-				*((uvlong *)parms[1]) = hosttm;
-			}
-			break;
-		case 11:/* maxpoolA: 0: address to return approx kernel pool value */
-			{
-				uvlong end = (uvlong)parms[1];
-				*((uvlong *)parms[0]) = ((uvlong)botsp(0) - end) / 2;
-			}
-			break;
-		case 12:/*ustktopA: 0: address to return the virtual address of user stack top */
-			*((ulong *)parms[0]) = (ulong)&phys - 0x1000;
-			break;
-		default:
-			printf("unknown svcn = %d\n", svcn);
-			break;
+void hostmem(void **pmemb, ulong *pnpage) {
+	void *phmem = physmem(PHYSMEM);
+	*pmemb = phmem;
+	*pnpage = NPAGE;
+}
+
+void confmem(ulong *pnpage, ulong *pupages) {
+	*pnpage = NPAGE;
+	*pupages = NPAGE;
+}
+
+ulong ustktop(void) {
+	return (ulong)&phys - 0x1000;
+}
+
+void timeres(uvlong *phz, uvlong *pres) {
+	struct timeval ts;
+	struct timezone tz;
+	uvlong hosttm;
+	int rc = gettimeofday(&ts, &tz);
+	if(rc == -1) {
+		perror("gettimeofday");
+		exit (-32);
 	}
-	return 0;
+	hosttm = (uvlong)ts.tv_sec * 1000000000ull + 
+		(uvlong)ts.tv_usec * 1000ull;
+	if(phz != NULL)
+		*phz = 50;
+	*pres = hosttm;
+}
+
+void kpool(ulong *pkpl, char *kmax) {
+	*pkpl = ((ulong)&pkpl - (ulong)kmax)/2;
 }
 
 int dblen(char *s) {
@@ -197,6 +153,13 @@ Patch ptt[] = {
 	(Patch){.symname = "host_free", .funaddr = free},
 	(Patch){.symname = "host_write", .funaddr = hwrite},
 	(Patch){.symname = "host_cpufreq", .funaddr = getmhz},
+	(Patch){.symname = "kprintf", .funaddr = vprintf},
+	(Patch){.symname = "host_getconf", .funaddr = getconf},
+	(Patch){.symname = "host_memsize", .funaddr = hostmem},
+	(Patch){.symname = "host_confmem", .funaddr = confmem},
+	(Patch){.symname = "host_ustktop", .funaddr = ustktop},
+	(Patch){.symname = "host_timeres", .funaddr = timeres},
+	(Patch){.symname = "host_kpool", .funaddr = kpool},
 	(Patch){NULL}
 };
 
@@ -208,7 +171,6 @@ Patch ptt[] = {
 void patchcode(void *addr, void *funaddr) {
 	unsigned char *caddr = addr;
 	if((caddr[0] == 0xFF) && (caddr[1] == 0x25)) {
-		printf("patching %08x\n", addr);
 		memcpy(caddr + 6, &funaddr, sizeof(funaddr));
 	}
 }
@@ -241,7 +203,7 @@ void hostlink(int fd, unsigned long offsyms, unsigned long ssyms) {
 	while(1) {
 		addrp = (unsigned long *)symp;
 		addr = __be32_to_cpu(*addrp);
-		stype = (char *)symp[4] - 0x80;
+		stype = symp[4] - 0x80;
 		symname = (char *)symp + 5;
 		switch(stype) {
 			case 'Z':
@@ -255,15 +217,13 @@ void hostlink(int fd, unsigned long offsyms, unsigned long ssyms) {
 		if((stype == 'T') && (!strcmp(symname, "__hostlink_begin")))
 			active = 1;
 		if(active) {
-			printf("%s[%d] / %c: %08lx\n", symname, symsize, stype, addr);
 			if((stype == 'T') && (!strcmp(symname, "__hostlink_end")))
 				break;
 			if(stype == 'T') {
 				Patch *p;
 				for(p = ptt; p->funaddr != NULL; p++) {
 					if(!strcmp(p->symname, symname)) {
-						printf("found %s to patch\n", symname);
-						patchcode(addr, p->funaddr);
+						patchcode((void *)addr, p->funaddr);
 					}
 				}
 			}
@@ -411,6 +371,6 @@ int main(int argc, char **argv) {
 		exit(-8);
 	}
 	close(fd);
-	(* (kstart)entry)(hostsvc);
+	(*(kstart)entry)();
 	exit(0);
 }

@@ -23,7 +23,7 @@
 void*
 kaddr(ulong pa)
 {
-kprintf("kaddr %08lx\n", pa);
+print("kaddr %08lx\n", pa);
 	if(pa > (ulong)-KZERO)
 		panic("kaddr: pa=%#.8lux", pa);
 	return (void*)pa;
@@ -66,9 +66,9 @@ mmuinit(void)
 void
 meminit(void)
 {
-	confmemAA(&conf.npage, &conf.upages);
-	ustktopA(&conf.ustktop);
-	hostmemAA(&palloc.mem[0].base, &palloc.mem[0].npage);
+	host_confmem(&conf.npage, &conf.upages);
+	conf.ustktop = host_ustktop();
+	host_memsize(&palloc.mem[0].base, &palloc.mem[0].npage);
 }
 
 /*
@@ -91,10 +91,10 @@ void*
 xallocz(ulong size, int zero)
 {
 	void *ret;
-	print("xallocz size %lud\n", size);
+	print("xallocz size %uld\n", size);
 //	mallocVA(size, &ret);
 	ret = host_alloc(size);
-print("xallocz alloc at %08lux\n", ret);
+print("xallocz alloc at %08p\n", ret);
 	if(zero)
 		memset(ret, 0, size);
 	return ret;
@@ -115,43 +115,42 @@ xmerge(void *, void *)
 KMap*
 kmap(Page *page)
 {
-kprintf("kmap pa: %08ux va: %08ux\n", page->pa, page->va);
+print("kmap pa: %08lx va: %08lx\n", page->pa, page->va);
 	return nil;
 }
 
 void
 mmurelease(Proc* proc)
 {
-kprintf("mmurelease pid:%d\n", proc->pid);
+print("mmurelease pid:%uld\n", proc->pid);
 	return;
 }
 
 void
 mmuswitch(Proc* proc)
 {
-kprintf("mmuswitch pid:%d\n", proc->pid);
+print("mmuswitch pid:%uld\n", proc->pid);
 	return;
 }
 
 ulong*
 mmuwalk(ulong* pdb, ulong va, int level, int create)
 {
-print("mmuwalk pdb=%08lux, va=%08lux, level=%d, create=%d\n", 
-(ulong)pdb, va, level, create);
+print("mmuwalk pdb=%08p, va=%08lux, level=%d, create=%d\n", pdb, va, level, create);
 	return 0;
 }
 
 void
 putmmu(ulong va, ulong pa, Page*)
 {
-kprintf("putmmu pa: %08ux va: %08ux\n", pa, va);
+print("putmmu pa: %08lx va: %08lx\n", pa, va);
 	return;
 }
 
 void
 kunmap(KMap *k)
 {
-kprintf("kunmap: %08ux\n", k);
+print("kunmap: %08p\n", k);
 	return;
 }
 
@@ -174,21 +173,21 @@ print("tmpmap pa: %08lux va: %08lux\n", p->pa, p->va);
 void
 tmpunmap(void *v)
 {
-print("tmpunmap: %08lux\n", v);
+print("tmpunmap: %08p\n", v);
 	return;
 }
 
 void*
 vmap(ulong pa, int size)
 {
-kprintf("vmap: pa:%08ux, size:%d\n", pa, size);
+print("vmap: pa:%08lx, size:%d\n", pa, size);
 	return nil;
 }
 
 void
 vunmap(void *v, int size)
 {
-kprintf("vmap: v:%08ux, size:%d\n", v, size);
+print("vmap: v:%08p, size:%d\n", v, size);
 	return;
 }
 
@@ -203,15 +202,15 @@ checkmmu(ulong, ulong)
 }
 
 void
-countpagerefs(ulong *ref, int print)
+countpagerefs(ulong *ref, int prt)
 {
-kprintf("countpagerefs: ref:%08ux, print:%d\n", ref, print);
+print("countpagerefs: ref:%08p, print:%d\n", ref, prt);
 }
 
 int
 vmapsync(ulong va)
 {
-kprintf("vmapsync: %08ux\n", va);
+print("vmapsync: %08lx\n", va);
 	return 1;
 }
 
@@ -224,13 +223,13 @@ flushmmu(void)
 ulong
 upaalloc(int size, int align)
 {
-kprintf("upaalloc size:%d, align:%d\n", size, align);
+print("upaalloc size:%d, align:%d\n", size, align);
 	return 0;
 }
 
 void
 upareserve(ulong pa, int size)
 {
-kprintf("upareserve pa:%08ux, size:%d\n", pa, size);
+print("upareserve pa:%08lx, size:%d\n", pa, size);
 	return;
 }

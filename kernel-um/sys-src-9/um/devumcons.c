@@ -147,11 +147,11 @@ putstrn0(char *str, int n, int usewrite)
 {
 
 	/*
-	 * In the UM kernel, use kwriteAU for line output 
+	 * In the UM kernel, use host_write for line output 
 	 * (whatever the host provides for this).
 	 */
 
-	kwriteAU(str, n);
+	host_write(str, n);
 	return;
 
 }

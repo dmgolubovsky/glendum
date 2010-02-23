@@ -210,7 +210,7 @@ ioalloc(int, int, int, char *)
  * there are no ports available
  */
 
-	kprintA("ioalloc: not possible in UM kernel\n");
+	print("ioalloc: not possible in UM kernel\n");
 	return -1;
 }
 

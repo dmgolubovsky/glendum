@@ -18,3 +18,17 @@ void HOSTLINK host_free HOSTARGS (void *p);
 
 int HOSTLINK host_cpufreq HOSTARGS (void);
 
+void HOSTLINK kprintf HOSTARGS (char *fmt, ...);
+
+void HOSTLINK host_getconf HOSTARGS (char *buf, int size);
+
+void HOSTLINK host_memsize HOSTARGS (ulong *pbase, ulong *pnpage);
+
+void HOSTLINK host_confmem HOSTARGS (ulong *pnpage, ulong *pupages);
+
+ulong HOSTLINK host_ustktop HOSTARGS (void);
+
+void HOSTLINK host_timeres HOSTARGS (uvlong *phz, uvlong *pres);
+
+void HOSTLINK host_kpool HOSTARGS (ulong *pkpl, char *kernmax);
+
