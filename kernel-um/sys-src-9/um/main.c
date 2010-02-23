@@ -147,9 +147,6 @@ mach0init(void)
 {
 	conf.nmach = 1;
 	MACHP(0) = (Mach*)CPU0MACH;
-	/*m->pdb = (ulong*)CPU0PDB;*/
-	/*m->gdt = (Segdesc*)CPU0GDT;*/
-
 	machinit();
 
 	active.machs = 1;
@@ -308,6 +305,8 @@ bootargs(void *base)
 	char buf[64];
 
 	sp = (uchar*)base + BY2PG - MAXSYSARG*BY2WD;
+
+print("bootargs: sp=%08p\n", sp);
 
 	ac = 0;
 	av[ac++] = pusharg("/386/9dos");

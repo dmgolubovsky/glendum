@@ -160,6 +160,7 @@ Patch ptt[] = {
 	(Patch){.symname = "host_ustktop", .funaddr = ustktop},
 	(Patch){.symname = "host_timeres", .funaddr = timeres},
 	(Patch){.symname = "host_kpool", .funaddr = kpool},
+	(Patch){.symname = "host_abort", .funaddr = exit},
 	(Patch){NULL}
 };
 

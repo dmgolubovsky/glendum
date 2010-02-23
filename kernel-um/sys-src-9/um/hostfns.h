@@ -32,3 +32,5 @@ void HOSTLINK host_timeres HOSTARGS (uvlong *phz, uvlong *pres);
 
 void HOSTLINK host_kpool HOSTARGS (ulong *pkpl, char *kernmax);
 
+void HOSTLINK host_abort HOSTARGS (int code);
+

@@ -5,6 +5,7 @@
  */
 #define VectorSYSCALL	0x40
 
+#ifdef XXXXXXXX
 /*
  *  Used to get to the first process:
  * 	set up an interrupt return frame and IRET to user level.
@@ -23,6 +24,7 @@ TEXT touser(SB), $0
 	MOVW	AX, GS
 	MOVW	AX, FS
 	IRETL
+#endif
 
 /*
  * This is merely _strayintr from l.s optimised to vector
