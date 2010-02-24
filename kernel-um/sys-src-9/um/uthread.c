@@ -41,12 +41,26 @@ uthreadinit(void)
 void
 printseg(Segment *s)
 {
+	int i;
 	if(!s) {
 		print("<nil>\n");
 		return;
 	}
-	print("type: %ud, base: %08lx, top %08lx, size: %uld, fstart: %08lx, flen: %08lx\n",
+	print("\ttype: %ud, base: %08lx, top %08lx, size: %uld"
+			", fstart: %08lx, flen: %08lx\n",
 			s->type, s->base, s->top, s->size, s->fstart, s->flen);
+	print("\tflushme: %d, mapsize: %d\n", s->flushme, s->mapsize);
+	for(i = 0; i < s->mapsize; i++) {
+		Pte *pte = s->map[i];
+		if(!pte) continue;
+		print("\tmap[%d]\n", i);
+		int j;
+		for(j = 0; j < PTEPERTAB; j++) {
+			if(!pte->pages[j]) continue;
+			print("\t\tpages[%d] pa: %08lx, va: %08lx\n", j, pte->pages[j]->pa,
+						pte->pages[j]->va);
+		}
+	}
 }
 
 /*

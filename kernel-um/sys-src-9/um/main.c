@@ -266,6 +266,11 @@ print("got here in userinit USTKTOP=%08lux\n", USTKTOP);
 	segpage(s, pg);
 	bootargs(v);
 	tmpunmap(v);
+	pg = newpage(0, 0, USTKTOP-2*BY2PG);
+	v = tmpmap(pg);
+	memset(v, 0, BY2PG);
+	segpage(s, pg);
+	tmpunmap(v);
 
 	/*
 	 * Text
