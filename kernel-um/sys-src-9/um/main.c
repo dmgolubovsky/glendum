@@ -154,16 +154,8 @@ void
 machinit(void)
 {
 	int machno;
-//	ulong *pdb;
-	/*Segdesc *gdt;*/
-
-	machno = m->machno;
-	/*pdb = m->pdb;*/
-	/*gdt = m->gdt;*/
-	memset(m, 0, sizeof(Mach));
+	machno = m->machno;	memset(m, 0, sizeof(Mach));
 	m->machno = machno;
-	/*m->pdb = pdb;*/
-	/*m->gdt = gdt;*/
 	m->perf.period = 1;
 
 	/*

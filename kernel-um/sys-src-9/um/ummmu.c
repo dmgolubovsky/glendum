@@ -219,9 +219,22 @@ print("vmapsync: %08lx\n", va);
 	return 1;
 }
 
+/*
+ * Flush all the user-space and device-mapping mmu info
+ * for this process, because something has been deleted.
+ * It will be paged back in on demand.
+ * The UM kernel will use up->newtlb to force user thread to remap
+ * its address space.
+ */
 void
 flushmmu(void)
 {
+	int s;
+print("flushmmu pid:%uld\n", up?up->pid:-1);
+	s = splhi();
+	up->newtlb = 1;
+	mmuswitch(up);
+	splx(s);
 }
 
 

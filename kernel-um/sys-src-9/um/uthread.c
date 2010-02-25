@@ -8,6 +8,7 @@
 #include	"dat.h"
 #include	"fns.h"
 #include	"umhost.h"
+#include	"uthread.h"
 
 /*
  * User thread descriptors. The kernel thread is the parent to all
@@ -26,12 +27,12 @@ static int actthreads;
 /*
  * Per-thread area. Each user thread gets a copy of it after
  * fork. This area contains a host file descriptor number
- * for the memory file, and an array of current mappings.
+ * for the memory file, and an array of current mappings (initially empty).
  * Each mapping is packed into an uvlong (64bit), and contains
  * physical address (offset in the memory file), virtual address
  * (where to map into the user thread address space), mapping
  * length (in page units, 4096 pages max), and read-write-exec
- * mode bits. Set of mappings is kept for each segment (NSEG total).
+ * mode bits.
  * Theoretically user code may have write access to this area.
  * It is however harmless: altering the memory file descriptor
  * may disrupt the current thread work, and cause abort of the
@@ -42,7 +43,8 @@ static int actthreads;
 
 static int memfd;
 
-static uvlong curmaps[NSEG];
+static uvlong *curmap;
+static int curmlen;
 
 /*
  * User thread start up.
@@ -51,6 +53,9 @@ static uvlong curmaps[NSEG];
 void 
 uthread_main(void)
 {
+	curmap = nil;
+	curmlen = 0;
+	print("memfd: %d\n", memfd);
 	host_traceme();
 	print("resumed\n");
 	host_abort(0);
@@ -78,10 +83,16 @@ uthreadinit(void)
 					uthreads[i].uthridx, uthreads[i].upid);
 			rc = host_waitpid(uthreads[i].upid, &status);
 			print("wait for child stop: %d, %08x\n", rc, status);
+			uthreads[i].hsyscalls = 0;
 		}
 	}
 }
 
+/*
+ * The up->newtlb flag (set by flushmmu) tells us that address space
+ * of a kernel thread has to be remapped. This also happens when a thread
+ * is rebound with process other than it was bound with before.
+ */
 
 /*
  * Debug: print a segment info.
