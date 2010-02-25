@@ -168,7 +168,8 @@ struct Uthread
 {
 	int upid;			/* Host process ID */
 	Proc *proc;			/* Plan 9 process descriptor, or nil if not bound */
-	uvlong cmmids[NSEG];/* current memory mappings */
+	uvlong cmmids[NSEG];/* current memory mapping ids */
+	int uthridx;		/* thread index in the uthreads array */
 	int hsyscalls;		/* 1 if host syscalls are allowed (special mode) */
 };
 

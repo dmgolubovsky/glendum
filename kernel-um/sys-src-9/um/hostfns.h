@@ -34,3 +34,10 @@ void HOSTLINK host_kpool HOSTARGS (ulong *pkpl, char *kernmax);
 
 void HOSTLINK host_abort HOSTARGS (int code);
 
+int HOSTLINK host_memfd HOSTARGS (void);
+
+int HOSTLINK host_uthread HOSTARGS (void);
+
+void HOSTLINK host_traceme HOSTARGS (void);
+
+int HOSTLINK host_waitpid HOSTARGS (int pid, int *status);

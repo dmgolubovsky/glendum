@@ -24,6 +24,39 @@ static Uthread uthreads[MAXUTHREAD];
 static int actthreads;
 
 /*
+ * Per-thread area. Each user thread gets a copy of it after
+ * fork. This area contains a host file descriptor number
+ * for the memory file, and an array of current mappings.
+ * Each mapping is packed into an uvlong (64bit), and contains
+ * physical address (offset in the memory file), virtual address
+ * (where to map into the user thread address space), mapping
+ * length (in page units, 4096 pages max), and read-write-exec
+ * mode bits. Set of mappings is kept for each segment (NSEG total).
+ * Theoretically user code may have write access to this area.
+ * It is however harmless: altering the memory file descriptor
+ * may disrupt the current thread work, and cause abort of the
+ * user process; host may re-spawn a thread in such case. Altering
+ * the current mappings will only cause the overhead when returning
+ * into the context of the thread by means of extra remappings.
+ */
+
+static int memfd;
+
+static uvlong curmaps[NSEG];
+
+/*
+ * User thread start up.
+ */
+
+void 
+uthread_main(void)
+{
+	host_traceme();
+	print("resumed\n");
+	host_abort(0);
+}
+
+/*
  * Initialize user threads. This has to be done early,
  * so forked host processes do not get the copy of kernel pool.
  */
@@ -31,6 +64,22 @@ static int actthreads;
 void 
 uthreadinit(void)
 {
+	int i;
+	memfd = host_memfd();
+	actthreads = MINUTHREAD;	/* has to come from the config */
+	for(i = 0; i < actthreads; i++) {
+		uthreads[i].uthridx = i;
+		uthreads[i].upid = host_uthread();
+		if(!uthreads[i].upid)
+			uthread_main();
+		else {
+			int rc, status;
+			print("forked user thread #%d, pid=%d\n",
+					uthreads[i].uthridx, uthreads[i].upid);
+			rc = host_waitpid(uthreads[i].upid, &status);
+			print("wait for child stop: %d, %08x\n", rc, status);
+		}
+	}
 }
 
 

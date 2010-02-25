@@ -14,6 +14,11 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/ptrace.h>
+#include <asm/ptrace.h>
+#include <asm/unistd.h>
 
 typedef long long vlong;
 typedef unsigned long long uvlong;
@@ -35,7 +40,8 @@ char *plan9ini=
 	"distname=plan9\r\n";
 
 
-#define PHYSMEM 64*1024*1024
+#define PHYSMEM 256*1024*1024
+#define PHYSBASE 0x1000
 
 #define NPAGE (PHYSMEM / 4096)
 
@@ -48,14 +54,26 @@ int hwrite(char *buf, size_t size) {
 	return write(1, buf, size);
 }
 
+static int memfd = -1;
+
+int mkmemfile(void) {
+	int fd = open("/tmp/physmem", O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+	if(fd == -1) {
+		perror("create phys mem file");
+		exit(-25);
+	}
+	memfd = fd;
+	printf("memfd: %d\n", fd);
+	return fd;
+}
 
 void *physmem(ulong size) {
 	int buf = 0, fd, rc;
 	void *ret;
-	fd = open("/tmp/physmem", O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
-	if(fd == -1) {
-		perror("create phys mem file");
-		exit(-25);
+	if(memfd == -1) {
+		fd = mkmemfile();
+	} else {
+		fd = memfd;
 	}
 	rc = lseek(fd, PHYSMEM, SEEK_CUR);
 	if(rc == -1) {
@@ -69,13 +87,14 @@ void *physmem(ulong size) {
 		close(fd);
 		exit(-26);
 	}
-	ret = mmap((void *)0x1000, PHYSMEM, PROT_READ | PROT_WRITE,
+	ret = mmap((void *)PHYSBASE, PHYSMEM, PROT_READ | PROT_WRITE,
 			MAP_SHARED | MAP_FIXED, fd, 0);
 	if(ret == MAP_FAILED) {
 		perror("mapping phys memory");
 		close(fd);
 		exit(-27);
 	}
+	memfd = fd;
 	return ret;
 
 }
@@ -143,6 +162,26 @@ int dblen(char *s) {
 }
 
 /*
+ * Set up tracing by the parent process. Stop itself.
+ */
+
+void traceme(void) {
+	if(ptrace(PTRACE_TRACEME) < 0) {
+		perror("traceme");
+		exit(-60);
+	}
+	kill(getpid(), SIGSTOP);
+}
+
+/*
+ * Wait for a PID with WUNTRACED flag.
+ */
+
+pid_t wpid(pid_t pid, int *status) {
+	return waitpid(pid, status, WUNTRACED);
+}
+
+/*
  * Table of patches. If a symbol is found with given name (.symname),
  * proper function address will be written at offset 2 from the symbol
  * to patch the code segment.
@@ -161,6 +200,10 @@ Patch ptt[] = {
 	(Patch){.symname = "host_timeres", .funaddr = timeres},
 	(Patch){.symname = "host_kpool", .funaddr = kpool},
 	(Patch){.symname = "host_abort", .funaddr = exit},
+	(Patch){.symname = "host_memfd", .funaddr = mkmemfile},
+	(Patch){.symname = "host_uthread", .funaddr = fork},
+	(Patch){.symname = "host_traceme", .funaddr = traceme},
+	(Patch){.symname = "host_waitpid", .funaddr = wpid},
 	(Patch){NULL}
 };
 

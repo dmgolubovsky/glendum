@@ -128,14 +128,11 @@ main(void)
 	initseg();
 	if(delaylink){
 		bootlinks();
-//		pcimatch(0, 0, 0);
 	}else
 		links();
 	conf.monitor = 1;
 	chandevreset();
 	pageinit();
-//	i8253link();
-//	swapinit();
 	userinit();
 print("***\n");
 	active.thunderbirdsarego = 1;
@@ -267,6 +264,21 @@ print("got here in userinit USTKTOP=%08lux\n", USTKTOP);
 	bootargs(v);
 	tmpunmap(v);
 	pg = newpage(0, 0, USTKTOP-2*BY2PG);
+	v = tmpmap(pg);
+	memset(v, 0, BY2PG);
+	segpage(s, pg);
+	tmpunmap(v);
+	pg = newpage(0, 0, USTKTOP-2047*BY2PG);
+	v = tmpmap(pg);
+	memset(v, 0, BY2PG);
+	segpage(s, pg);
+	tmpunmap(v);
+	pg = newpage(0, 0, USTKTOP-2048*BY2PG);
+	v = tmpmap(pg);
+	memset(v, 0, BY2PG);
+	segpage(s, pg);
+	tmpunmap(v);
+	pg = newpage(0, 0, USTKTOP-2049*BY2PG);
 	v = tmpmap(pg);
 	memset(v, 0, BY2PG);
 	segpage(s, pg);
