@@ -154,8 +154,9 @@ void
 machinit(void)
 {
 	int machno;
-	machno = m->machno;	memset(m, 0, sizeof(Mach));
-	m->machno = machno;
+	machno = m->machno;	
+	memset(m, 0, sizeof(Mach));
+	m->machno = machno;	
 	m->perf.period = 1;
 
 	/*
