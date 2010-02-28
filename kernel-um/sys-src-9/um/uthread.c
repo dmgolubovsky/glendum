@@ -39,12 +39,17 @@ static int actthreads;
  * user process; host may re-spawn a thread in such case. Altering
  * the current mappings will only cause the overhead when returning
  * into the context of the thread by means of extra remappings.
+ * Also a special stack is allocated for each user thread to be used
+ * when remapping process memory: at some moment user stack may be
+ * completely unmapped, so to keep the code running, a temporary
+ * stack is needed.
  */
 
 static int memfd;
 
 static uvlong *curmap;
 static int curmlen;
+static uchar upstk[UPSTKSZ]; /* stack to use when remapping memory */
 
 /*
  * User thread start up.
@@ -144,7 +149,9 @@ procsegs(Proc *p)
 
 /*
  * Replacement of touser: get here to start the user part of the first
- * process.
+ * process. Thread #0 is always bound with the first process. Set up the
+ * registers first (eip and esp), then conditionally force memory
+ * remapping.
  */
 
 void 
@@ -152,5 +159,18 @@ touser(void *sp)
 {
 	print("touser pid=%uld sp=%08p\n", up?up->pid:-1, sp);
 	procsegs(up);
+	up->PMMU.uthr = &uthreads[0];
+	uthreads[0].proc = up;
+	poke_eax(uthreads[0].upid, 0);
+	poke_eip(uthreads[0].upid, UTZERO + 32);	/* just like in plan9l.s */
+	poke_esp(uthreads[0].upid, (ulong)sp);
+	ptrace_cont(uthreads[0].upid);
+{
+int rc, status=0;
+ulong eip;
+rc = host_waitpid(uthreads[0].upid, &status);
+eip=peek_eip(uthreads[0].upid);
+print("touser: rc=%d, status=%08x, eip=%08lx\n", rc, status, eip);
+}
 	host_abort(0);
 }

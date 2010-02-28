@@ -41,3 +41,13 @@ int HOSTLINK host_uthread HOSTARGS (void);
 void HOSTLINK host_traceme HOSTARGS (void);
 
 int HOSTLINK host_waitpid HOSTARGS (int pid, int *status);
+
+ulong HOSTLINK peek_eax HOSTARGS (int pid);
+ulong HOSTLINK peek_eip HOSTARGS (int pid);
+ulong HOSTLINK peek_esp HOSTARGS (int pid);
+
+void HOSTLINK poke_eax HOSTARGS (int pid, ulong val);
+void HOSTLINK poke_eip HOSTARGS (int pid, ulong val);
+void HOSTLINK poke_esp HOSTARGS (int pid, ulong val);
+
+void HOSTLINK ptrace_cont HOSTARGS (int pid);

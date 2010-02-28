@@ -182,6 +182,47 @@ pid_t wpid(pid_t pid, int *status) {
 }
 
 /*
+ * For convenience, define three pairs of functions to access saved
+ * registers in the user area. We are only interested in EAX, EIP, and ESP.
+ */
+
+#define __GETREG__(pid, r) ptrace(PTRACE_PEEKUSER, pid, sizeof(ulong) * r, 0)
+
+ulong peek_eax(pid_t pid) {
+	return (__GETREG__(pid, ORIG_EAX));
+}
+
+ulong peek_eip(pid_t pid) {
+	return (__GETREG__(pid, EIP));
+}
+
+ulong peek_esp(pid_t pid) {
+	return (__GETREG__(pid, UESP));
+}
+
+#define __SETREG__(pid, r, v) ptrace(PTRACE_POKEUSER, pid, sizeof(ulong) * r, v)
+
+void poke_eax(pid_t pid, ulong val) {
+	__SETREG__(pid, ORIG_EAX, val);
+}
+
+void poke_eip(pid_t pid, ulong val) {
+	__SETREG__(pid, EIP, val);
+}
+
+void poke_esp(pid_t pid, ulong val) {
+	__SETREG__(pid, UESP, val);
+}
+
+/*
+ * Restart a process until a host syscall or some exception arises.
+ */
+
+void ptrace_cont(pid_t pid) {
+	ptrace(PTRACE_SYSEMU, pid, 0, 0);
+}
+
+/*
  * Table of patches. If a symbol is found with given name (.symname),
  * proper function address will be written at offset 2 from the symbol
  * to patch the code segment.
@@ -204,6 +245,13 @@ Patch ptt[] = {
 	(Patch){.symname = "host_uthread", .funaddr = fork},
 	(Patch){.symname = "host_traceme", .funaddr = traceme},
 	(Patch){.symname = "host_waitpid", .funaddr = wpid},
+	(Patch){.symname = "peek_eax", .funaddr = peek_eax},
+	(Patch){.symname = "peek_eip", .funaddr = peek_eip},
+	(Patch){.symname = "peek_esp", .funaddr = peek_esp},
+	(Patch){.symname = "poke_eax", .funaddr = poke_eax},
+	(Patch){.symname = "poke_eip", .funaddr = poke_eip},
+	(Patch){.symname = "poke_esp", .funaddr = poke_esp},
+	(Patch){.symname = "ptrace_cont", .funaddr = ptrace_cont},
 	(Patch){NULL}
 };
 
