@@ -51,3 +51,6 @@ void HOSTLINK poke_eip HOSTARGS (int pid, ulong val);
 void HOSTLINK poke_esp HOSTARGS (int pid, ulong val);
 
 void HOSTLINK ptrace_cont HOSTARGS (int pid);
+
+ulong HOSTLINK peek_user HOSTARGS (int pid, void *addr);
+void  HOSTLINK poke_user HOSTARGS (int pid, void *addr, ulong val);

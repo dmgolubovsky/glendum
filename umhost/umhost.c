@@ -215,6 +215,18 @@ void poke_esp(pid_t pid, ulong val) {
 }
 
 /*
+ * Copy signle word to/from user thread memory.
+ */
+
+void poke_user(pid_t pid, void *addr, ulong val) {
+	ptrace(PTRACE_POKEDATA, pid, addr, val);
+}
+
+ulong peek_user(pid_t pid, void *addr) {
+	return ptrace(PTRACE_PEEKDATA, pid, addr, 0);
+}
+
+/*
  * Restart a process until a host syscall or some exception arises.
  */
 
@@ -252,6 +264,8 @@ Patch ptt[] = {
 	(Patch){.symname = "poke_eip", .funaddr = poke_eip},
 	(Patch){.symname = "poke_esp", .funaddr = poke_esp},
 	(Patch){.symname = "ptrace_cont", .funaddr = ptrace_cont},
+	(Patch){.symname = "peek_user", .funaddr = peek_user},
+	(Patch){.symname = "poke_user", .funaddr = poke_user},
 	(Patch){NULL}
 };
 

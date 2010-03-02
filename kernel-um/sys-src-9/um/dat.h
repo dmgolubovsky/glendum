@@ -164,6 +164,18 @@ struct Notsave
 
 #define MINUTHREAD 2
 
+/*
+ * Possible states of a user thread.
+ */
+
+enum
+{
+	UIdle,				/* thread is not bound with any process */
+	URunning,			/* normal running state */
+	URemapping,			/* memory remapping in progress */
+	USyscall			/* waiting for the process while in syscall */
+};
+
 struct Uthread
 {
 	int upid;			/* Host process ID */
@@ -171,6 +183,10 @@ struct Uthread
 	uvlong cmmids[NSEG];/* current memory mapping ids */
 	int uthridx;		/* thread index in the uthreads array */
 	int hsyscalls;		/* 1 if host syscalls are allowed (special mode) */
+	ulong mmeax;		/* save EAX while remapping memory */
+	ulong mmeip;		/* save EIP while remapping memory */
+	ulong mmesp;		/* save ESP while remapping memory */
+	int state;			/* thread state (see enum above) */
 };
 
 typedef struct {

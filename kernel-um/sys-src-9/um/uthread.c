@@ -47,7 +47,7 @@ static int actthreads;
 
 static int memfd;
 
-static uvlong *curmap;
+static ulong *curmap;
 static int curmlen;
 static uchar upstk[UPSTKSZ]; /* stack to use when remapping memory */
 
@@ -89,6 +89,7 @@ uthreadinit(void)
 			rc = host_waitpid(uthreads[i].upid, &status);
 			print("wait for child stop: %d, %08x\n", rc, status);
 			uthreads[i].hsyscalls = 0;
+			uthreads[i].state = UIdle;
 		}
 	}
 }
@@ -148,6 +149,118 @@ procsegs(Proc *p)
 }
 
 /*
+ * Find an user thread descriptor by the host PID. Given small number
+ * of items searched over, linear search is fine. Return nil if not found.
+ */
+
+Uthread *
+find_uthread(int pid)
+{
+	int i;
+	for(i = 0; i < actthreads; i++)
+		if(uthreads[i].upid == pid)
+			return uthreads + i;
+	return nil;
+}
+
+/*
+ * Infinite loop of ptracing user threads.
+ */
+
+void
+kthread_loop(void)
+{
+	int rc, status;
+	Uthread *uthr;
+	while(1) {
+		rc = host_waitpid(0, &status);
+		uthr = find_uthread(rc);
+		print("host process %d, Plan9 process %ld, status %08x\n",
+			rc, uthr?uthr->proc->pid:-1, status);
+	}
+}
+
+/*
+ * Remap user thread memory if needed (up->newtlb is set). Otherwise
+ * just return. To remap, place the remapping information onto the
+ * special stack (upstk) in the user thread address space, then
+ * invoke the code in the user thread which will perform the actual
+ * remapping. Remapping information is placed as a pair of ulongs
+ * (since ptrace does not allow copying larger chunks of information
+ * than an ulong). The ulong at index 0 contains "physical" address
+ * of the mapping in bits 12 - 31, and R-W-X mask in bits 0 - 2.
+ * The ulong at index 1 contains "virtual" address of the mapping in
+ * bits 12 - 31, and number of pages to map in bits 0 - 11. 
+ * Number of mappings is placed on the stack below the mapping information.
+ */
+
+#define M_R 1
+#define M_W 2
+#define M_X 4
+
+void
+umem_remap(Uthread *uthr)
+{
+	int i, j, k, nmap;
+	uchar *usptr = upstk + UPSTKSZ - sizeof(ulong);
+	if(!up->newtlb)
+		return;
+	uthr->state = URemapping;
+	uthr->mmeax = peek_eax(uthr->upid);	/* save user's registers */
+	uthr->mmeip = peek_eip(uthr->upid);	/* while remapping: they will be */
+	uthr->mmesp = peek_esp(uthr->upid);	/* restored when remapping is done */
+
+	/*
+	 * Go over process' segments and find all existing mappings
+	 * to be done. (NB adjacent pages have to be collapsed, won't do this
+	 * now.
+	 */
+
+	for(nmap = 0, i = 0; i < NSEG; i++) {
+		Segment *s = uthr->proc->seg[i];
+		if(!s) 
+			continue;
+		for(j = 0; j < s->mapsize; j++) {
+			Pte *p = s->map[j];
+			ulong segperm = 0;
+			if(!p)
+				continue;
+			switch(s->type & SG_TYPE) {
+				case SG_TEXT:
+					segperm = M_R | M_X;
+					break;
+				case SG_DATA:
+				case SG_BSS:
+				case SG_STACK:
+					segperm = M_R | M_W;	/* also M_X? */
+					break;
+				default:
+					print("pid %uld segment %d %d type %d\n",
+						uthr->proc->pid, i, j, s->type);
+			}
+			for(k = 0; k < PTEPERTAB; k++) {
+				Page *pg = p->pages[k];
+				ulong mapping[2];
+				if(!pg)
+					continue;
+				mapping[0] = (pg->pa & (~0xFFF)) | segperm;
+				mapping[1] = (pg->va & (~0xFFF)) | 1;
+				print("mapping[0]: %08lx, mapping[1]: %08lx\n",
+					mapping[0], mapping[1]);
+				nmap++;
+				poke_user(uthr->upid, usptr, mapping[1]);
+				usptr-=sizeof(ulong);
+				poke_user(uthr->upid, usptr, mapping[0]);
+				usptr-=sizeof(ulong);
+			}
+		}
+	}
+	poke_user(uthr->upid, usptr, nmap);
+	usptr-=sizeof(ulong);
+	print("total mappings %d\n", nmap);
+}
+
+/*
  * Replacement of touser: get here to start the user part of the first
  * process. Thread #0 is always bound with the first process. Set up the
  * registers first (eip and esp), then conditionally force memory
@@ -164,13 +277,8 @@ touser(void *sp)
 	poke_eax(uthreads[0].upid, 0);
 	poke_eip(uthreads[0].upid, UTZERO + 32);	/* just like in plan9l.s */
 	poke_esp(uthreads[0].upid, (ulong)sp);
+	uthreads[0].state = URunning;
+	umem_remap(uthreads);						/* remap memory if needed */
 	ptrace_cont(uthreads[0].upid);
-{
-int rc, status=0;
-ulong eip;
-rc = host_waitpid(uthreads[0].upid, &status);
-eip=peek_eip(uthreads[0].upid);
-print("touser: rc=%d, status=%08x, eip=%08lx\n", rc, status, eip);
-}
-	host_abort(0);
+	kthread_loop();								/* go to the infinite kernel loop */
 }
