@@ -227,12 +227,32 @@ ulong peek_user(pid_t pid, void *addr) {
 }
 
 /*
- * Restart a process until a host syscall or some exception arises.
+ * Restart a process until a host syscall or some exception arises. If the second
+ * argument is true PTRACE_SYSCALL will be used, so syscalls can be handled. Otherwise
+ * host syscalls are not allowed for the user thread, so PTRACE_SYSEMU is sufficient
+ * just to catch them.
  */
 
-void ptrace_cont(pid_t pid) {
-	ptrace(PTRACE_SYSEMU, pid, 0, 0);
+void ptrace_cont(pid_t pid, int hsyscall) {
+	ptrace(hsyscall?PTRACE_SYSCALL:PTRACE_SYSEMU, pid, 0, 0);
 }
+
+/*
+ * Return true if user thread was stopped by SIGTRAP (syscall).
+ */
+
+int is_trap(int status) {
+	return (WIFSTOPPED(status) && (WSTOPSIG(status) == SIGTRAP));
+}
+
+/*
+ * Return true if user thread was stopped by SIGSEGV.
+ */
+
+int is_segv(int status) {
+	return (WIFSTOPPED(status) && (WSTOPSIG(status) == SIGSEGV));
+}
+
 
 /*
  * Table of patches. If a symbol is found with given name (.symname),
@@ -266,6 +286,8 @@ Patch ptt[] = {
 	(Patch){.symname = "ptrace_cont", .funaddr = ptrace_cont},
 	(Patch){.symname = "peek_user", .funaddr = peek_user},
 	(Patch){.symname = "poke_user", .funaddr = poke_user},
+	(Patch){.symname = "is_trap", .funaddr = is_trap},
+	(Patch){.symname = "is_segv", .funaddr = is_segv},
 	(Patch){NULL}
 };
 

@@ -177,7 +177,24 @@ kthread_loop(void)
 		uthr = find_uthread(rc);
 		print("host process %d, Plan9 process %ld, status %08x\n",
 			rc, uthr?uthr->proc->pid:-1, status);
+		if(!uthr) 
+			continue;
+		if(is_trap(status) && uthr->hsyscalls)
+			ptrace_cont(uthr->upid, uthr->hsyscalls);
 	}
+}
+
+/*
+ * This function runs in the context of user thread. It gets
+ * number of mappings from its first parameter, and the rest
+ * is the number of mappings specified (each mapping is described
+ * by two ulongs).
+ */
+
+void
+do_maps(ulong nmaps, ulong map0, ...)
+{
+	print("do_maps: nmaps=%lud\n", nmaps);
 }
 
 /*
@@ -258,6 +275,21 @@ umem_remap(Uthread *uthr)
 	poke_user(uthr->upid, usptr, nmap);
 	usptr-=sizeof(ulong);
 	print("total mappings %d\n", nmap);
+	poke_user(uthr->upid, usptr, 0);
+	/*
+	 * At this point, the user stack contains a fake zero return address,
+	 * number of mappings, and mappings themselves. The function that does
+     * the mappings is variadic: void do_maps(ulong nmaps, ulong map0, ...).
+	 * The function should not return: instead is just calls host_abort
+	 * which corresponds to exit. This tells the kernel thread loop to
+	 * disable host syscalls on the user thread, restore the saved
+	 * registers, and resume execution.
+	 */
+	poke_eax(uthr->upid, 0);
+	poke_esp(uthr->upid, (ulong)usptr);
+	poke_eip(uthr->upid, (ulong)do_maps);
+	uthr->hsyscalls = 1;
+	return;
 }
 
 /*
@@ -279,6 +311,6 @@ touser(void *sp)
 	poke_esp(uthreads[0].upid, (ulong)sp);
 	uthreads[0].state = URunning;
 	umem_remap(uthreads);						/* remap memory if needed */
-	ptrace_cont(uthreads[0].upid);
+	ptrace_cont(uthreads[0].upid, uthreads[0].hsyscalls);
 	kthread_loop();								/* go to the infinite kernel loop */
 }
