@@ -23,6 +23,14 @@
 typedef long long vlong;
 typedef unsigned long long uvlong;
 
+/*
+ * Memory mapping flags: must be consistent with definitions in uthread.c
+ */
+
+#define M_R 1
+#define M_W 2
+#define M_X 4
+
 #include "a.out.h"
 #include "multiboot.h"
 
@@ -188,8 +196,12 @@ pid_t wpid(pid_t pid, int *status) {
 
 #define __GETREG__(pid, r) ptrace(PTRACE_PEEKUSER, pid, sizeof(ulong) * r, 0)
 
-ulong peek_eax(pid_t pid) {
+ulong peek_sys(pid_t pid) {
 	return (__GETREG__(pid, ORIG_EAX));
+}
+
+ulong peek_eax(pid_t pid) {
+	return (__GETREG__(pid, EAX));
 }
 
 ulong peek_eip(pid_t pid) {
@@ -202,8 +214,12 @@ ulong peek_esp(pid_t pid) {
 
 #define __SETREG__(pid, r, v) ptrace(PTRACE_POKEUSER, pid, sizeof(ulong) * r, v)
 
-void poke_eax(pid_t pid, ulong val) {
+void poke_sys(pid_t pid, ulong val) {
 	__SETREG__(pid, ORIG_EAX, val);
+}
+
+void poke_eax(pid_t pid, ulong val) {
+	__SETREG__(pid, EAX, val);
 }
 
 void poke_eip(pid_t pid, ulong val) {
@@ -234,11 +250,20 @@ ulong peek_user(pid_t pid, void *addr) {
  */
 
 void ptrace_cont(pid_t pid, int hsyscall) {
+	ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
 	ptrace(hsyscall?PTRACE_SYSCALL:PTRACE_SYSEMU, pid, 0, 0);
 }
 
 /*
  * Return true if user thread was stopped by SIGTRAP (syscall).
+ */
+
+int is_sysc(int status) {
+	return (WIFSTOPPED(status) && (WSTOPSIG(status) == (SIGTRAP|0x80)));
+}
+
+/*
+ * Return true if user thread was stopped by SIGTRAP (other than syscall).
  */
 
 int is_trap(int status) {
@@ -253,6 +278,36 @@ int is_segv(int status) {
 	return (WIFSTOPPED(status) && (WSTOPSIG(status) == SIGSEGV));
 }
 
+/*
+ * Return true if the syscall is one to cause program exit.
+ */
+
+int is_exit(int sysc) {
+	return (sysc == __NR_exit)||(sysc == __NR_exit_group);
+}
+
+/*
+ * Perform memory mapping on behalf of the user thread. Specifying memory
+ * protection all bits zero means unmapping at given addresses. Offset in the
+ * physical memory file is reduced by PHYSBASE. Length of mapped memory
+ * is expected in bytes.
+ */
+
+void *host_mmap(int fd, ulong pa, void *va, ulong length, ulong mprot) {
+	if(mprot == 0) {
+		printf("unmapping %08lx/%08lx\n", pa, (ulong)va);
+		munmap(va, length);
+		return NULL;
+	} else {
+		int prot = 0;
+		if(mprot & M_R) prot |= PROT_READ;
+		if(mprot & M_W) prot |= PROT_WRITE;
+		if(mprot & M_X) prot |= PROT_EXEC;
+		printf("mapping %08lx/%08lx\n", pa, (ulong)va);
+		return mmap(va, length, prot, MAP_SHARED | MAP_FIXED, fd, pa - PHYSBASE);
+	}
+	
+}
 
 /*
  * Table of patches. If a symbol is found with given name (.symname),
@@ -272,14 +327,16 @@ Patch ptt[] = {
 	(Patch){.symname = "host_ustktop", .funaddr = ustktop},
 	(Patch){.symname = "host_timeres", .funaddr = timeres},
 	(Patch){.symname = "host_kpool", .funaddr = kpool},
-	(Patch){.symname = "host_abort", .funaddr = exit},
+	(Patch){.symname = "host_abort", .funaddr = _exit},
 	(Patch){.symname = "host_memfd", .funaddr = mkmemfile},
 	(Patch){.symname = "host_uthread", .funaddr = fork},
 	(Patch){.symname = "host_traceme", .funaddr = traceme},
 	(Patch){.symname = "host_waitpid", .funaddr = wpid},
+	(Patch){.symname = "peek_sys", .funaddr = peek_sys},
 	(Patch){.symname = "peek_eax", .funaddr = peek_eax},
 	(Patch){.symname = "peek_eip", .funaddr = peek_eip},
 	(Patch){.symname = "peek_esp", .funaddr = peek_esp},
+	(Patch){.symname = "poke_sys", .funaddr = poke_sys},
 	(Patch){.symname = "poke_eax", .funaddr = poke_eax},
 	(Patch){.symname = "poke_eip", .funaddr = poke_eip},
 	(Patch){.symname = "poke_esp", .funaddr = poke_esp},
@@ -287,7 +344,10 @@ Patch ptt[] = {
 	(Patch){.symname = "peek_user", .funaddr = peek_user},
 	(Patch){.symname = "poke_user", .funaddr = poke_user},
 	(Patch){.symname = "is_trap", .funaddr = is_trap},
+	(Patch){.symname = "is_sysc", .funaddr = is_sysc},
 	(Patch){.symname = "is_segv", .funaddr = is_segv},
+	(Patch){.symname = "is_exit", .funaddr = is_exit},
+	(Patch){.symname = "host_mmap", .funaddr = host_mmap},
 	(Patch){NULL}
 };
 

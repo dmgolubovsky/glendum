@@ -43,9 +43,11 @@ void HOSTLINK host_traceme HOSTARGS (void);
 int HOSTLINK host_waitpid HOSTARGS (int pid, int *status);
 
 ulong HOSTLINK peek_eax HOSTARGS (int pid);
+ulong HOSTLINK peek_sys HOSTARGS (int pid);
 ulong HOSTLINK peek_eip HOSTARGS (int pid);
 ulong HOSTLINK peek_esp HOSTARGS (int pid);
 
+void HOSTLINK poke_sys HOSTARGS (int pid, ulong val);
 void HOSTLINK poke_eax HOSTARGS (int pid, ulong val);
 void HOSTLINK poke_eip HOSTARGS (int pid, ulong val);
 void HOSTLINK poke_esp HOSTARGS (int pid, ulong val);
@@ -57,3 +59,8 @@ void  HOSTLINK poke_user HOSTARGS (int pid, void *addr, ulong val);
 
 int HOSTLINK is_trap HOSTARGS (int status);
 int HOSTLINK is_segv HOSTARGS (int status);
+int HOSTLINK is_sysc HOSTARGS (int status);
+
+int HOSTLINK is_exit HOSTARGS (int sysc);
+
+void * HOSTLINK host_mmap HOSTARGS (int fd, ulong pa, ulong va, ulong length, int mprot);

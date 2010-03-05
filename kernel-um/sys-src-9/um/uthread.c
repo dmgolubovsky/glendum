@@ -164,6 +164,29 @@ find_uthread(int pid)
 }
 
 /*
+ * Handle syscalls while in the remapping state. If the syscall
+ * corresponds to exit (__NR_exit, __NR_exit_group), restore the
+ * saved registers, disable host syscalls, set state to running.
+ * Otherwise just allow the syscall to proceed.
+ */
+
+void
+handle_remap(Uthread *uthr)
+{
+	ulong sysno = peek_sys(uthr->upid);
+	print("handle_remap: syscall %uld\n", sysno);
+	if(is_exit(sysno)) {
+		poke_sys(uthr->upid, 0xFFFFFFFF);
+		poke_eax(uthr->upid, uthr->mmeax);
+		poke_eip(uthr->upid, uthr->mmeip);
+		poke_esp(uthr->upid, uthr->mmesp);
+		uthr->state = URunning;
+		uthr->hsyscalls = 0;
+	}
+	ptrace_cont(uthr->upid, uthr->hsyscalls);
+}
+
+/*
  * Infinite loop of ptracing user threads.
  */
 
@@ -179,8 +202,21 @@ kthread_loop(void)
 			rc, uthr?uthr->proc->pid:-1, status);
 		if(!uthr) 
 			continue;
-		if(is_trap(status) && uthr->hsyscalls)
-			ptrace_cont(uthr->upid, uthr->hsyscalls);
+		/*
+		 * User thread invokes a syscall, and syscalls are allowed.
+		 */
+		if(is_sysc(status) && uthr->hsyscalls) {
+			if(uthr->state == URemapping)
+				handle_remap(uthr);
+			else
+				print("syscall while not in remapping state\n");
+		} else if(is_segv(status) && (uthr->state == URunning)) {
+			ulong eip = peek_eip(uthr->upid);
+			ulong instr = peek_user(uthr->upid, (void *)eip);
+			ulong sysno = peek_eax(uthr->upid) & 0x00FF;
+			if((instr & 0x0000FFFF) == 0x40CD)
+				print("plan9 syscall %uld at %08lx\n", sysno, eip);
+		}
 	}
 }
 
@@ -188,13 +224,42 @@ kthread_loop(void)
  * This function runs in the context of user thread. It gets
  * number of mappings from its first parameter, and the rest
  * is the number of mappings specified (each mapping is described
- * by two ulongs).
+ * by two ulongs). First, existing mappings are removed. Next, new mappings
+ * are taken into action, and stored instead of previously existing.
+ * For better optimizing, it makes sense just to compare old and new
+ * mappings, and remap only the difference 
+ * (this is for the future improvement). Finally, the funciton calls
+ * host_abort to terminate itself, and finally switch to the user code.
  */
 
 void
 do_maps(ulong nmaps, ulong map0, ...)
 {
+	int i;
+	ulong *mapping;
 	print("do_maps: nmaps=%lud\n", nmaps);
+	if(curmap && curmlen) {
+		for(i = 0, mapping = curmap; i < curmlen; i++, mapping+=2) {
+			ulong pa = mapping[0] & (~0xFFF);
+			ulong va = mapping[1] & (~0xFFF);
+			ulong length = (mapping[1] & 0xFFF) << 12;
+			host_mmap(memfd, pa, va, length, 0);
+		}
+		host_free(curmap);
+		curmlen = 0;
+	}
+	for(i = 0, mapping = &map0; i < nmaps; i++, mapping+=2) {
+		ulong pa = mapping[0] & (~0xFFF);
+		ulong va = mapping[1] & (~0xFFF);
+		int prot = mapping[0] & 0x07;
+		ulong length = (mapping[1] & 0xFFF) << 12;
+		host_mmap(memfd, pa, va, length, prot);
+	}
+	curmap = host_alloc(nmaps * 2 * sizeof(ulong));
+	for(i = 0; i < nmaps * 2; i++)
+		curmap[i] = (&map0)[i];
+	curmlen = nmaps;
+	host_abort(0);
 }
 
 /*
@@ -289,6 +354,7 @@ umem_remap(Uthread *uthr)
 	poke_esp(uthr->upid, (ulong)usptr);
 	poke_eip(uthr->upid, (ulong)do_maps);
 	uthr->hsyscalls = 1;
+	uthr->state = URemapping;
 	return;
 }
 
